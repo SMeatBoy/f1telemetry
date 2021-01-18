@@ -289,15 +289,16 @@ class Session:
                                                             f1telemetry.sessiontype.SessionType(
                                                                 self.session_type).pretty_name())), 'wb') as f:
                 pickle.dump(self.packets, f)
-        print('{} digested session end: {}-{}'.format(time.strftime('%H:%M:%S.%f'),
-                                                      f1telemetry.tracks.Tracks(self.track_id).name,
-                                                      f1telemetry.sessiontype.SessionType(
-                                                          self.session_type).pretty_name()))
+        print('{} digested session end: {} {}-{}'.format(datetime.datetime.now().strftime('%H:%M:%S.%f'),
+                                                         self.uid,
+                                                         f1telemetry.tracks.Tracks(self.track_id).name,
+                                                         f1telemetry.sessiontype.SessionType(
+                                                             self.session_type).pretty_name()))
 
 
 class PacketDigester:
 
-    def __init__(self, queue=None, save_packets=False):
+    def __init__(self, queue, save_packets=False):
         self.current_session = None
         self.current_session_uid = 0
         self.current_session_time = 0
@@ -408,12 +409,12 @@ class PacketDigester:
             p.num_tyre_stints = classificationData.numTyreStints
             for tyre_stint in classificationData.tyreStintsActual:
                 p.tyre_stints.append(tyre_stint)
-        if self.queue is not None:
-            self.queue.put(self.current_session)
         print('{} received session end: {} {}-{}'.format(datetime.datetime.now().strftime('%H:%M:%S.%f'),
                                                          self.current_session.uid,
                                                          f1telemetry.tracks.Tracks(self.current_session.track_id).name,
                                                          f1telemetry.sessiontype.SessionType(
                                                              self.current_session.session_type).pretty_name()))
+
+        self.queue.put(self.current_session)
         self.current_session_uid = 0
         self.current_session = None
