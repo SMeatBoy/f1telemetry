@@ -1,4 +1,5 @@
 import datetime
+import os
 import pickle
 import time as time_module
 
@@ -82,7 +83,7 @@ class Session:
     def module(self):
         return np
 
-    def plot_fastest_lap_distance(self, time=None):
+    def plot_fastest_lap_distance(self, output_path, time=None):
         fig = plt.figure()
         fig.suptitle('{} - {}: Best Lap Telemetry - Distance (m)'.format(f1telemetry.tracks.Tracks(self.track_id).name,
                                                                          f1telemetry.sessiontype.SessionType(
@@ -143,10 +144,10 @@ class Session:
                     fastest_hotlap_index[0]:fastest_hotlap_index[1]],
                     label=participant.data.raceNumber, color=color, linestyle=line_style)
         axs[2].legend(loc='lower left')
-        self.save_fig(fig, (21, 9), time)
+        self.save_fig(fig, output_path, (21, 9), time)
         plt.close(fig)
 
-    def plot_race_summary(self, time=None):
+    def plot_race_summary(self, output_path, time=None):
         used_team_ids = []
         fig = plt.figure()
         fig.suptitle(
@@ -174,7 +175,8 @@ class Session:
         formatter = matplotlib.ticker.FuncFormatter(
             lambda seconds, x: time_module.strftime('%-M:%S', time_module.gmtime(seconds)))
         ax2.yaxis.set_major_formatter(formatter)
-        ax2.yaxis.set_minor_locator(matplotlib.ticker.MultipleLocator(1))
+        ax2.yaxis.set_major_locator(matplotlib.ticker.MultipleLocator(2))
+        ax2.yaxis.set_minor_locator(matplotlib.ticker.MultipleLocator(0.5))
         ax2.yaxis.grid(True, 'minor', linestyle='--', color='#E0E0E0')
 
         for p in self.participants:
@@ -209,7 +211,7 @@ class Session:
 
         fig.legend(bbox_to_anchor=(.1, 0.96, .85, 0), loc='upper left', ncol=num_participants, mode="expand",
                    borderaxespad=0.)
-        self.save_fig(fig, (16, 18), time)
+        self.save_fig(fig, output_path, (16, 18), time)
         plt.close(fig)
 
     def get_tyre_data(self):
@@ -258,33 +260,39 @@ class Session:
                                 (((stints[j][0] - stints[j - 1][0]) / 2 + stints[j - 1][0]), i),
                                 ha='center', va='center', zorder=4)
 
-    def save_fig(self, fig, aspect_ratio, time=None):
+    def save_fig(self, fig, output_path, aspect_ratio, time=None):
         fig.set_size_inches(aspect_ratio)
         if time is not None:
-            fig.savefig(
-                '{}_{}_{}-{}.svg'.format(time.strftime('%Y-%m-%d_%H:%M'), self.uid, f1telemetry.tracks.Tracks(self.track_id).name,
-                                         f1telemetry.sessiontype.SessionType(self.session_type).pretty_name()),
-                format='svg', dpi=300)
+            fig.savefig(os.path.join(output_path,
+                                     '{}_{}_{}-{}.svg'.format(time.strftime('%Y-%m-%d'), self.uid,
+                                                              f1telemetry.tracks.Tracks(self.track_id).name,
+                                                              f1telemetry.sessiontype.SessionType(
+                                                                  self.session_type).pretty_name())),
+                        format='svg', dpi=300)
         else:
-            fig.savefig(
-                '{}_{}-{}.svg'.format(self.uid, f1telemetry.tracks.Tracks(self.track_id).name,
-                                      f1telemetry.sessiontype.SessionType(self.session_type).pretty_name()),
-                format='svg', dpi=300)
+            fig.savefig(os.path.join(output_path,
+                                     '{}_{}-{}.svg'.format(self.uid, f1telemetry.tracks.Tracks(self.track_id).name,
+                                                           f1telemetry.sessiontype.SessionType(
+                                                               self.session_type).pretty_name())),
+                        format='svg', dpi=300)
 
-    def process_end(self, save_packets):
+    def process_end(self, output_path, save_packets):
         time = datetime.datetime.now()
         if self.session_type == f1telemetry.sessiontype.SessionType.R:
-            self.plot_race_summary(time)
+            self.plot_race_summary(output_path, time)
         elif self.session_type == f1telemetry.sessiontype.SessionType.Q_Short:
-            self.plot_fastest_lap_distance(time)
+            self.plot_fastest_lap_distance(output_path, time)
         if save_packets:
-            with open('{}_{}_{}-{}.pkl'.format(time.strftime('%Y-%m-%d_%H:%M'), self.uid,
-                                               f1telemetry.tracks.Tracks(self.track_id).name,
-                                               f1telemetry.sessiontype.SessionType(self.session_type).pretty_name()), 'wb') as f:
+            with open(os.path.join(output_path,
+                                   '{}_{}_{}-{}.pkl'.format(time.strftime('%Y-%m-%d'), self.uid,
+                                                            f1telemetry.tracks.Tracks(self.track_id).name,
+                                                            f1telemetry.sessiontype.SessionType(
+                                                                self.session_type).pretty_name())), 'wb') as f:
                 pickle.dump(self.packets, f)
         print('{} digested session end: {}-{}'.format(time.strftime('%H:%M:%S.%f'),
                                                       f1telemetry.tracks.Tracks(self.track_id).name,
-                                                      f1telemetry.sessiontype.SessionType(self.session_type).pretty_name()))
+                                                      f1telemetry.sessiontype.SessionType(
+                                                          self.session_type).pretty_name()))
 
 
 class PacketDigester:
@@ -293,7 +301,6 @@ class PacketDigester:
         self.current_session = None
         self.current_session_uid = 0
         self.current_session_time = 0
-        # self.sessions = []
         self.queue = queue
         self.save_packets = save_packets
 
@@ -316,16 +323,13 @@ class PacketDigester:
                 return self.digest_packet_car_status(packet)
 
     def digest_packet_session_data(self, packet):
-        # if self.current_session_uid != 0 and self.queue is None:
-        #     self.sessions.pop()
         self.current_session_uid = packet.header.sessionUID
         self.current_session = Session(packet)
         self.current_session.packets = []
-        # if self.queue is None:
-        #     self.sessions.append(self.current_session)
         print('{} received session start: {} {}-{}'.format(datetime.datetime.now().strftime('%H:%M:%S.%f'),
                                                            self.current_session.uid,
-                                                           f1telemetry.tracks.Tracks(self.current_session.track_id).name,
+                                                           f1telemetry.tracks.Tracks(
+                                                               self.current_session.track_id).name,
                                                            f1telemetry.sessiontype.SessionType(
                                                                self.current_session.session_type).pretty_name()))
 
@@ -336,7 +340,7 @@ class PacketDigester:
 
     def digest_packet_lap_data(self, packet):
         for lapData, p in zip(packet.lapData[:len(self.current_session.participants)],
-                                        self.current_session.participants):
+                              self.current_session.participants):
             if lapData.currentLapNum != p.current_lap_num:
                 if p.current_lap_num >= 1:
                     p.laps[-1].total_time = lapData.lastLapTime
@@ -347,8 +351,9 @@ class PacketDigester:
                 p.current_lap_num = lapData.currentLapNum
                 while p.current_lap_num > len(p.laps):
                     p.laps.append(f1telemetry.lap.Lap())
-            p.laps[p.current_lap_num - 1].distance.append(lapData.lapDistance)
-            p.laps[p.current_lap_num - 1].time.append(lapData.currentLapTime)
+            if p.data.aiControlled == 0:
+                p.laps[p.current_lap_num - 1].distance.append(lapData.lapDistance)
+                p.laps[p.current_lap_num - 1].time.append(lapData.currentLapTime)
             p.laps[p.current_lap_num - 1].driver_status.append(lapData.driverStatus)
             p.laps[p.current_lap_num - 1].pit_status.append(lapData.pitStatus)
             p.laps[p.current_lap_num - 1].car_position.append(lapData.carPosition)
@@ -358,31 +363,33 @@ class PacketDigester:
         for carTelemetryData, p in zip(
                 packet.carTelemetryData[:len(self.current_session.participants)],
                 self.current_session.participants):
-            p.laps[p.current_lap_num - 1].telemetry.speed.append(
-                carTelemetryData.speed)
-            p.laps[p.current_lap_num - 1].telemetry.throttle.append(
-                carTelemetryData.throttle)
-            p.laps[p.current_lap_num - 1].telemetry.steer.append(
-                carTelemetryData.steer)
-            p.laps[p.current_lap_num - 1].telemetry.brake.append(
-                carTelemetryData.brake)
-            p.laps[p.current_lap_num - 1].telemetry.clutch.append(
-                carTelemetryData.clutch)
-            p.laps[p.current_lap_num - 1].telemetry.gear.append(
-                carTelemetryData.gear)
-            p.laps[p.current_lap_num - 1].telemetry.engine_rpm.append(
-                carTelemetryData.engineRPM)
-            p.laps[p.current_lap_num - 1].telemetry.drs.append(carTelemetryData.drs)
-            p.laps[p.current_lap_num - 1].telemetry.rev_lights_percent.append(
-                carTelemetryData.revLightsPercent)
+            if p.data.aiControlled == 0:
+                p.laps[p.current_lap_num - 1].telemetry.speed.append(
+                    carTelemetryData.speed)
+                p.laps[p.current_lap_num - 1].telemetry.throttle.append(
+                    carTelemetryData.throttle)
+                p.laps[p.current_lap_num - 1].telemetry.steer.append(
+                    carTelemetryData.steer)
+                p.laps[p.current_lap_num - 1].telemetry.brake.append(
+                    carTelemetryData.brake)
+                p.laps[p.current_lap_num - 1].telemetry.clutch.append(
+                    carTelemetryData.clutch)
+                p.laps[p.current_lap_num - 1].telemetry.gear.append(
+                    carTelemetryData.gear)
+                p.laps[p.current_lap_num - 1].telemetry.engine_rpm.append(
+                    carTelemetryData.engineRPM)
+                p.laps[p.current_lap_num - 1].telemetry.drs.append(carTelemetryData.drs)
+                p.laps[p.current_lap_num - 1].telemetry.rev_lights_percent.append(
+                    carTelemetryData.revLightsPercent)
 
     def digest_packet_car_status(self, packet):
         for carStatusData, p in zip(
                 packet.carStatusData[:len(self.current_session.participants)],
                 self.current_session.participants):
-            p.laps[p.current_lap_num - 1].tyre_compound_actual = carStatusData.actualTyreCompound
-            p.laps[p.current_lap_num - 1].tyre_compound_visual = carStatusData.visualTyreCompound
-            p.laps[p.current_lap_num - 1].tyre_age_laps = carStatusData.tyresAgeLaps
+            if p.data.aiControlled == 0:
+                p.laps[p.current_lap_num - 1].tyre_compound_actual = carStatusData.actualTyreCompound
+                p.laps[p.current_lap_num - 1].tyre_compound_visual = carStatusData.visualTyreCompound
+                p.laps[p.current_lap_num - 1].tyre_age_laps = carStatusData.tyresAgeLaps
 
     def digest_packet_final_classification(self, packet):
         for classificationData, p, in zip(

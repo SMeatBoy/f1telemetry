@@ -59,7 +59,7 @@ def proc_socket(sock, queue):
         queue.put(sock.recvfrom(1500)[0])
 
 
-def proc_digest(queue_packets, queue_sessions, save_packets=False,is_unpacked=False):
+def proc_digest(queue_packets, queue_sessions, save_packets=False, is_unpacked=False):
     packet_digester = f1telemetry.session.PacketDigester(queue_sessions, save_packets)
     i = 0
     while True:
@@ -76,15 +76,15 @@ def proc_digest(queue_packets, queue_sessions, save_packets=False,is_unpacked=Fa
                 packet_digester.digest(unpack_udp_packet(msg))
 
 
-def proc_session_end(queue, save_packets=False):
+def proc_session_end(queue, output_path, save_packets=False):
     while True:
         s = queue.get()
         if s == 'DONE':
             break
-        s.process_end(save_packets)
+        s.process_end(output_path, save_packets)
 
 
-def digest_packets_from_socket(port, address, save_packets):
+def digest_packets_from_socket(port, address, output_path, save_packets):
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     except socket.error as msg:
@@ -100,9 +100,10 @@ def digest_packets_from_socket(port, address, save_packets):
     queue_sessions = multiprocessing.Queue()
     p_socket = multiprocessing.Process(target=proc_socket, args=(s, queue_packets))
     p_socket.start()
-    p_digest = multiprocessing.Process(target=proc_digest, args=(queue_packets, queue_sessions, save_packets))
+    p_digest = multiprocessing.Process(target=proc_digest,
+                                       args=(queue_packets, queue_sessions, save_packets))
     p_digest.start()
-    p_session_end = multiprocessing.Process(target=proc_session_end, args=(queue_sessions, save_packets))
+    p_session_end = multiprocessing.Process(target=proc_session_end, args=(queue_sessions, output_path, save_packets))
     p_session_end.start()
     try:
         p_socket.join()
@@ -120,24 +121,24 @@ def digest_packets_from_socket(port, address, save_packets):
         print('digested received packets. bye')
 
 
-def digest_packets_from_file(filename):
+def digest_packets_from_file(filename, output_path, save_packets):
     queue_packets = multiprocessing.Queue()
     queue_sessions = multiprocessing.Queue()
 
     if filename.endswith('.pkl'):
-        save_packets = False
         is_unpacked = True
+        if save_packets:
+            print("not saving packets, they're already in a separate .pkl file")
+            save_packets = False
     else:
-        # save_packets = True
-        save_packets = False
         is_unpacked = False
     p_file = multiprocessing.Process(target=proc_file, args=(filename, queue_packets))
     p_file.start()
-    p_digest = multiprocessing.Process(target=proc_digest, args=(queue_packets, queue_sessions, save_packets,is_unpacked))
+    p_digest = multiprocessing.Process(target=proc_digest,
+                                       args=(queue_packets, queue_sessions, save_packets, is_unpacked))
     p_digest.start()
-    p_session_end = multiprocessing.Process(target=proc_session_end, args=(queue_sessions, save_packets))
+    p_session_end = multiprocessing.Process(target=proc_session_end, args=(queue_sessions, output_path, save_packets))
     p_session_end.start()
-    # proc_digest(queue_packets,queue_sessions,save_packets,is_unpacked)
     p_file.join()
     p_digest.join()
     p_session_end.join()
@@ -150,13 +151,13 @@ def main():
     mode.add_argument('-f', '--file', help='Read packets from file', type=str, dest='file')
     parser.add_argument('-p', '--port', help='Port to listen to in. Network mode only', type=int)
     parser.add_argument('-a', '--address', help='IP Address to listen to in. Network mode only', type=str)
-    parser.add_argument('--save_packets', help='Save packets of session to file', default=False, action='store_true')
-    parser.add_argument('-o', '--output_path', help='Directory to place files in', default='.', required=False)
+    parser.add_argument('--save-packets', help='Save packets of session to file', default=False, action='store_true')
+    parser.add_argument('-o', '--output-path', help='Directory to place files in', default='.', required=False)
     args = parser.parse_args()
     if args.network:
-        digest_packets_from_socket(int(args.port), args.address, args.save_packets)
+        digest_packets_from_socket(int(args.port), args.address, args.output_path, args.save_packets)
     elif args.file:
-        digest_packets_from_file(args.file)
+        digest_packets_from_file(args.file, args.output_path, args.save_packets)
 
 
 if __name__ == '__main__':
