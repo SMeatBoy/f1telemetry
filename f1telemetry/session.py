@@ -10,23 +10,23 @@ import numpy as np
 
 from f1_2020_telemetry.packets import *
 
-import lap
-import participant
-import sessiontype
-import team
-import tracks
+import f1telemetry.lap
+import f1telemetry.participant
+import f1telemetry.sessiontype
+import f1telemetry.team
+import f1telemetry.tracks
 
 teams = [
-    team.Team('Mercedes', 0, '#00D2BE'),
-    team.Team('Ferrari', 1, '#FF2800'),
-    team.Team('Red Bull Racing', 2, '#0600EF'),
-    team.Team('Williams', 3, '#0082FA'),
-    team.Team('Racing Point', 4, '#F596C8'),
-    team.Team('Renault', 5, '#FFF500'),
-    team.Team('Alpha Tauri', 6, '#C8C8C8'),
-    team.Team('Haas', 7, '#787878'),
-    team.Team('McLaren', 8, '#FF8700'),
-    team.Team('Alfa Romeo', 9, '#9B0000'),
+    f1telemetry.team.Team('Mercedes', 0, '#00D2BE'),
+    f1telemetry.team.Team('Ferrari', 1, '#FF2800'),
+    f1telemetry.team.Team('Red Bull Racing', 2, '#0600EF'),
+    f1telemetry.team.Team('Williams', 3, '#0082FA'),
+    f1telemetry.team.Team('Racing Point', 4, '#F596C8'),
+    f1telemetry.team.Team('Renault', 5, '#FFF500'),
+    f1telemetry.team.Team('Alpha Tauri', 6, '#C8C8C8'),
+    f1telemetry.team.Team('Haas', 7, '#787878'),
+    f1telemetry.team.Team('McLaren', 8, '#FF8700'),
+    f1telemetry.team.Team('Alfa Romeo', 9, '#9B0000'),
 ]
 
 tyre_colors = {
@@ -84,8 +84,8 @@ class Session:
 
     def plot_fastest_lap_distance(self, time=None):
         fig = plt.figure()
-        fig.suptitle('{} - {}: Best Lap Telemetry - Distance (m)'.format(tracks.Tracks(self.track_id).name,
-                                                                         sessiontype.SessionType(
+        fig.suptitle('{} - {}: Best Lap Telemetry - Distance (m)'.format(f1telemetry.tracks.Tracks(self.track_id).name,
+                                                                         f1telemetry.sessiontype.SessionType(
                                                                              self.session_type).pretty_name()))
         gs = matplotlib.gridspec.GridSpec(6, 1, left=0.04, right=0.99, bottom=0.03, top=0.95)
         axs = [fig.add_subplot(gs[0, :])]
@@ -150,8 +150,8 @@ class Session:
         used_team_ids = []
         fig = plt.figure()
         fig.suptitle(
-            '{} - {}'.format(tracks.Tracks(self.track_id).name,
-                             sessiontype.SessionType(self.session_type).pretty_name()),
+            '{} - {}'.format(f1telemetry.tracks.Tracks(self.track_id).name,
+                             f1telemetry.sessiontype.SessionType(self.session_type).pretty_name()),
             fontsize=20)
         gs = fig.add_gridspec(20, 1, left=0.03, right=0.99, bottom=0.03, top=0.93, hspace=1.3)
 
@@ -262,29 +262,29 @@ class Session:
         fig.set_size_inches(aspect_ratio)
         if time is not None:
             fig.savefig(
-                '{}_{}_{}-{}.svg'.format(time.strftime('%Y-%m-%d_%H:%M'), self.uid, tracks.Tracks(self.track_id).name,
-                                         sessiontype.SessionType(self.session_type).pretty_name()),
+                '{}_{}_{}-{}.svg'.format(time.strftime('%Y-%m-%d_%H:%M'), self.uid, f1telemetry.tracks.Tracks(self.track_id).name,
+                                         f1telemetry.sessiontype.SessionType(self.session_type).pretty_name()),
                 format='svg', dpi=300)
         else:
             fig.savefig(
-                '{}_{}-{}.svg'.format(self.uid, tracks.Tracks(self.track_id).name,
-                                      sessiontype.SessionType(self.session_type).pretty_name()),
+                '{}_{}-{}.svg'.format(self.uid, f1telemetry.tracks.Tracks(self.track_id).name,
+                                      f1telemetry.sessiontype.SessionType(self.session_type).pretty_name()),
                 format='svg', dpi=300)
 
     def process_end(self, save_packets):
         time = datetime.datetime.now()
-        if self.session_type == sessiontype.SessionType.R:
+        if self.session_type == f1telemetry.sessiontype.SessionType.R:
             self.plot_race_summary(time)
-        elif self.session_type == sessiontype.SessionType.Q_Short:
+        elif self.session_type == f1telemetry.sessiontype.SessionType.Q_Short:
             self.plot_fastest_lap_distance(time)
         if save_packets:
             with open('{}_{}_{}-{}.pkl'.format(time.strftime('%Y-%m-%d_%H:%M'), self.uid,
-                                               tracks.Tracks(self.track_id).name,
-                                               sessiontype.SessionType(self.session_type).pretty_name()), 'wb') as f:
+                                               f1telemetry.tracks.Tracks(self.track_id).name,
+                                               f1telemetry.sessiontype.SessionType(self.session_type).pretty_name()), 'wb') as f:
                 pickle.dump(self.packets, f)
         print('{} digested session end: {}-{}'.format(time.strftime('%H:%M:%S.%f'),
-                                                      tracks.Tracks(self.track_id).name,
-                                                      sessiontype.SessionType(self.session_type).pretty_name()))
+                                                      f1telemetry.tracks.Tracks(self.track_id).name,
+                                                      f1telemetry.sessiontype.SessionType(self.session_type).pretty_name()))
 
 
 class PacketDigester:
@@ -325,14 +325,14 @@ class PacketDigester:
         #     self.sessions.append(self.current_session)
         print('{} received session start: {} {}-{}'.format(datetime.datetime.now().strftime('%H:%M:%S.%f'),
                                                            self.current_session.uid,
-                                                           tracks.Tracks(self.current_session.track_id).name,
-                                                           sessiontype.SessionType(
+                                                           f1telemetry.tracks.Tracks(self.current_session.track_id).name,
+                                                           f1telemetry.sessiontype.SessionType(
                                                                self.current_session.session_type).pretty_name()))
 
     def digest_packet_participants(self, packet):
         for p in packet.participants:
             if p.raceNumber != 0:
-                self.current_session.participants.append(participant.Participant(p))
+                self.current_session.participants.append(f1telemetry.participant.Participant(p))
 
     def digest_packet_lap_data(self, packet):
         for lapData, p in zip(packet.lapData[:len(self.current_session.participants)],
@@ -343,10 +343,10 @@ class PacketDigester:
                     if p.best_lap_time == 0 or p.best_lap_time > lapData.lastLapTime:
                         p.best_lap_time = lapData.lastLapTime
                         p.best_lap_index = p.current_lap_num - 1
-                p.laps.append(lap.Lap())
+                p.laps.append(f1telemetry.lap.Lap())
                 p.current_lap_num = lapData.currentLapNum
                 while p.current_lap_num > len(p.laps):
-                    p.laps.append(lap.Lap())
+                    p.laps.append(f1telemetry.lap.Lap())
             p.laps[p.current_lap_num - 1].distance.append(lapData.lapDistance)
             p.laps[p.current_lap_num - 1].time.append(lapData.currentLapTime)
             p.laps[p.current_lap_num - 1].driver_status.append(lapData.driverStatus)
@@ -405,8 +405,8 @@ class PacketDigester:
             self.queue.put(self.current_session)
         print('{} received session end: {} {}-{}'.format(datetime.datetime.now().strftime('%H:%M:%S.%f'),
                                                          self.current_session.uid,
-                                                         tracks.Tracks(self.current_session.track_id).name,
-                                                         sessiontype.SessionType(
+                                                         f1telemetry.tracks.Tracks(self.current_session.track_id).name,
+                                                         f1telemetry.sessiontype.SessionType(
                                                              self.current_session.session_type).pretty_name()))
         self.current_session_uid = 0
         self.current_session = None

@@ -6,7 +6,7 @@ import sys
 
 from f1_2020_telemetry.packets import *
 
-import session
+import f1telemetry.session
 
 
 def remove_duplicate_session_types(sessions):
@@ -60,7 +60,7 @@ def proc_socket(sock, queue):
 
 
 def proc_digest(queue_packets, queue_sessions, save_packets=False,is_unpacked=False):
-    packet_digester = session.PacketDigester(queue_sessions, save_packets)
+    packet_digester = f1telemetry.session.PacketDigester(queue_sessions, save_packets)
     i = 0
     while True:
         msg = queue_packets.get()

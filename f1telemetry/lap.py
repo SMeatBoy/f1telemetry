@@ -1,4 +1,4 @@
-from cartelemetry import CarTelemetry
+from f1telemetry.cartelemetry import CarTelemetry
 
 
 class Lap:
