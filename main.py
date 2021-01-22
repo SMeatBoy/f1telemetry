@@ -59,7 +59,7 @@ def proc_socket(sock, queue):
         queue.put(sock.recvfrom(1500)[0])
 
 
-def proc_digest(queue_packets, queue_sessions, save_packets=False, is_unpacked=False):
+def proc_digest(queue_packets, queue_sessions, output_path,save_packets=False, is_unpacked=False):
     packet_digester = f1telemetry.session.PacketDigester(queue_sessions, save_packets)
     i = 0
     while True:
@@ -67,7 +67,7 @@ def proc_digest(queue_packets, queue_sessions, save_packets=False, is_unpacked=F
         if msg == 'DONE':
             queue_sessions.put('DONE')
             if packet_digester.current_session is not None:
-                packet_digester.current_session.process_end(save_packets)
+                packet_digester.current_session.process_end(output_path,save_packets)
             break
         else:
             if is_unpacked:
@@ -101,7 +101,7 @@ def digest_packets_from_socket(port, address, output_path, save_packets):
     p_socket = multiprocessing.Process(target=proc_socket, args=(s, queue_packets))
     p_socket.start()
     p_digest = multiprocessing.Process(target=proc_digest,
-                                       args=(queue_packets, queue_sessions, save_packets))
+                                       args=(queue_packets, queue_sessions, output_path,save_packets))
     p_digest.start()
     p_session_end = multiprocessing.Process(target=proc_session_end, args=(queue_sessions, output_path, save_packets))
     p_session_end.start()
@@ -135,7 +135,7 @@ def digest_packets_from_file(filename, output_path, save_packets):
     p_file = multiprocessing.Process(target=proc_file, args=(filename, queue_packets))
     p_file.start()
     p_digest = multiprocessing.Process(target=proc_digest,
-                                       args=(queue_packets, queue_sessions, save_packets, is_unpacked))
+                                       args=(queue_packets, queue_sessions, output_path, save_packets, is_unpacked))
     p_digest.start()
     p_session_end = multiprocessing.Process(target=proc_session_end, args=(queue_sessions, output_path, save_packets))
     p_session_end.start()
