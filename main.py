@@ -76,15 +76,15 @@ def proc_digest(queue_packets, queue_sessions, output_path, save_packets=False, 
                 packet_digester.digest(unpack_udp_packet(msg))
 
 
-def proc_session_end(queue, output_path, save_packets=False, plot_ai=False):
+def proc_session_end(queue, output_path, save_packets=False, plot_ai=False, discord_url=""):
     while True:
         s = queue.get()
         if s == 'DONE':
             break
-        s.process_end(output_path, save_packets, plot_ai)
+        s.process_end(output_path, save_packets, plot_ai, discord_url)
 
 
-def digest_packets_from_socket(port, address, output_path, save_packets, plot_ai):
+def digest_packets_from_socket(port, address, output_path, save_packets, plot_ai, discord_url):
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     except socket.error as msg:
@@ -103,7 +103,8 @@ def digest_packets_from_socket(port, address, output_path, save_packets, plot_ai
     p_digest = multiprocessing.Process(target=proc_digest,
                                        args=(queue_packets, queue_sessions, output_path, save_packets, False, plot_ai))
     p_digest.start()
-    p_session_end = multiprocessing.Process(target=proc_session_end, args=(queue_sessions, output_path, save_packets))
+    p_session_end = multiprocessing.Process(target=proc_session_end,
+                                            args=(queue_sessions, output_path, save_packets, discord_url))
     p_session_end.start()
     try:
         p_socket.join()
@@ -121,7 +122,7 @@ def digest_packets_from_socket(port, address, output_path, save_packets, plot_ai
         print('digested received packets. bye')
 
 
-def digest_packets_from_file(filename, output_path, save_packets, plot_ai):
+def digest_packets_from_file(filename, output_path, save_packets, plot_ai, discord_url):
     queue_packets = multiprocessing.Queue()
     queue_sessions = multiprocessing.Queue()
 
@@ -139,7 +140,8 @@ def digest_packets_from_file(filename, output_path, save_packets, plot_ai):
                                            queue_packets, queue_sessions, output_path, save_packets, is_unpacked,
                                            plot_ai))
     p_digest.start()
-    p_session_end = multiprocessing.Process(target=proc_session_end, args=(queue_sessions, output_path, save_packets))
+    p_session_end = multiprocessing.Process(target=proc_session_end,
+                                            args=(queue_sessions, output_path, save_packets,plot_ai, discord_url))
     p_session_end.start()
     p_file.join()
     p_digest.join()
@@ -157,11 +159,13 @@ def main():
     parser.add_argument('--plot-ai', help='Plot qualification lap of fastest AI driver', default=False,
                         action='store_true')
     parser.add_argument('-o', '--output-path', help='Directory to place files in', default='.', required=False)
+    parser.add_argument('--discord-url', help='URL of Discord Webhook to post results to', default='', required=False)
     args = parser.parse_args()
     if args.network:
-        digest_packets_from_socket(int(args.port), args.address, args.output_path, args.save_packets, args.plot_ai)
+        digest_packets_from_socket(int(args.port), args.address, args.output_path, args.save_packets, args.plot_ai,
+                                   args.discord_url)
     elif args.file:
-        digest_packets_from_file(args.file, args.output_path, args.save_packets, args.plot_ai)
+        digest_packets_from_file(args.file, args.output_path, args.save_packets, args.plot_ai, args.discord_url)
 
 
 if __name__ == '__main__':

@@ -16,6 +16,7 @@ import f1telemetry.participant
 import f1telemetry.sessiontype
 import f1telemetry.team
 import f1telemetry.tracks
+import f1telemetry.discord_automation
 
 teams = [
     f1telemetry.team.Team('Mercedes', 0, '#00D2BE'),
@@ -152,8 +153,9 @@ class Session:
                         fastest_hotlap_index[0]:fastest_hotlap_index[1]],
                         label=participant.data.raceNumber, color=color, linestyle=line_style)
         axs[2].legend(loc='lower left')
-        self.save_fig(fig, output_path, (21, 9), time)
+        file_name = self.save_fig(fig, output_path, (21, 9), time)
         plt.close(fig)
+        return file_name
 
     def plot_race_summary(self, output_path, time=None):
         used_team_ids = []
@@ -219,8 +221,9 @@ class Session:
 
         fig.legend(bbox_to_anchor=(.1, 0.96, .85, 0), loc='upper left', ncol=num_participants, mode="expand",
                    borderaxespad=0.)
-        self.save_fig(fig, output_path, (16, 18), time)
+        file_name = self.save_fig(fig, output_path, (16, 18), time)
         plt.close(fig)
+        return file_name
 
     def get_tyre_data(self):
         tyre_data = {}
@@ -271,25 +274,25 @@ class Session:
     def save_fig(self, fig, output_path, aspect_ratio, time=None):
         fig.set_size_inches(aspect_ratio)
         if time is not None:
-            fig.savefig(os.path.join(output_path,
-                                     '{}_{}_{}-{}.svg'.format(time.strftime('%Y-%m-%d'), self.uid,
-                                                              f1telemetry.tracks.Tracks(self.track_id).name,
-                                                              f1telemetry.sessiontype.SessionType(
-                                                                  self.session_type).pretty_name())),
-                        format='svg', dpi=300)
-        else:
-            fig.savefig(os.path.join(output_path,
-                                     '{}_{}-{}.svg'.format(self.uid, f1telemetry.tracks.Tracks(self.track_id).name,
-                                                           f1telemetry.sessiontype.SessionType(
-                                                               self.session_type).pretty_name())),
-                        format='svg', dpi=300)
+            file_name = '{}_{}_{}-{}.svg'.format(time.strftime('%Y-%m-%d'), self.uid,
+                                                 f1telemetry.tracks.Tracks(self.track_id).name,
+                                                 f1telemetry.sessiontype.SessionType(
+                                                     self.session_type).pretty_name())
 
-    def process_end(self, output_path, save_packets, plot_ai):
+        else:
+            file_name = '{}_{}-{}.svg'.format(self.uid, f1telemetry.tracks.Tracks(self.track_id).name,
+                                              f1telemetry.sessiontype.SessionType(
+                                                  self.session_type).pretty_name())
+        fig.savefig(os.path.join(output_path, file_name), format='svg', dpi=300)
+        return file_name
+
+    def process_end(self, output_path, save_packets, plot_ai, discord_url):
         time = datetime.datetime.now()
+        file_name = ""
         if self.session_type == f1telemetry.sessiontype.SessionType.R:
-            self.plot_race_summary(output_path, time)
+            file_name = self.plot_race_summary(output_path, time)
         elif self.session_type == f1telemetry.sessiontype.SessionType.Q_Short:
-            self.plot_fastest_lap_distance(output_path, time, plot_ai)
+            file_name = self.plot_fastest_lap_distance(output_path, time, plot_ai)
         if save_packets:
             with open(os.path.join(output_path,
                                    '{}_{}_{}-{}.pkl'.format(time.strftime('%Y-%m-%d'), self.uid,
@@ -297,11 +300,18 @@ class Session:
                                                             f1telemetry.sessiontype.SessionType(
                                                                 self.session_type).pretty_name())), 'wb') as f:
                 pickle.dump(self.packets, f)
-        print('{} digested session end: {} {}-{}'.format(datetime.datetime.now().strftime('%H:%M:%S.%f'),
-                                                         self.uid,
-                                                         f1telemetry.tracks.Tracks(self.track_id).name,
-                                                         f1telemetry.sessiontype.SessionType(
-                                                             self.session_type).pretty_name()))
+        if discord_url and file_name:
+            f1telemetry.discord_automation.upload_to_webhook(discord_url, os.path.join(output_path, file_name),
+                                                             '{}-{}.svg'.format(
+                                                                 f1telemetry.tracks.Tracks(self.track_id).name,
+                                                                 f1telemetry.sessiontype.SessionType(
+                                                                     self.session_type).pretty_name()))
+            print('{} digested session end: {} {}-{}'.format(datetime.datetime.now().strftime('%H:%M:%S.%f'),
+                                                             self.uid,
+                                                             f1telemetry.tracks.Tracks(self.track_id).name,
+                                                             f1telemetry.sessiontype.SessionType(
+                                                                 self.session_type).pretty_name()))
+        return file_name
 
 
 class PacketDigester:
