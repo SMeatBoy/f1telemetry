@@ -59,15 +59,15 @@ def proc_socket(sock, queue):
         queue.put(sock.recvfrom(1500)[0])
 
 
-def proc_digest(queue_packets, queue_sessions, output_path,save_packets=False, is_unpacked=False):
-    packet_digester = f1telemetry.session.PacketDigester(queue_sessions, save_packets)
+def proc_digest(queue_packets, queue_sessions, output_path, save_packets=False, is_unpacked=False, plot_ai=False):
+    packet_digester = f1telemetry.session.PacketDigester(queue_sessions, save_packets, plot_ai)
     i = 0
     while True:
         msg = queue_packets.get()
         if msg == 'DONE':
             queue_sessions.put('DONE')
             if packet_digester.current_session is not None:
-                packet_digester.current_session.process_end(output_path,save_packets)
+                packet_digester.current_session.process_end(output_path, save_packets)
             break
         else:
             if is_unpacked:
@@ -76,15 +76,15 @@ def proc_digest(queue_packets, queue_sessions, output_path,save_packets=False, i
                 packet_digester.digest(unpack_udp_packet(msg))
 
 
-def proc_session_end(queue, output_path, save_packets=False):
+def proc_session_end(queue, output_path, save_packets=False, plot_ai=False):
     while True:
         s = queue.get()
         if s == 'DONE':
             break
-        s.process_end(output_path, save_packets)
+        s.process_end(output_path, save_packets, plot_ai)
 
 
-def digest_packets_from_socket(port, address, output_path, save_packets):
+def digest_packets_from_socket(port, address, output_path, save_packets, plot_ai):
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     except socket.error as msg:
@@ -101,7 +101,7 @@ def digest_packets_from_socket(port, address, output_path, save_packets):
     p_socket = multiprocessing.Process(target=proc_socket, args=(s, queue_packets))
     p_socket.start()
     p_digest = multiprocessing.Process(target=proc_digest,
-                                       args=(queue_packets, queue_sessions, output_path,save_packets))
+                                       args=(queue_packets, queue_sessions, output_path, save_packets, False, plot_ai))
     p_digest.start()
     p_session_end = multiprocessing.Process(target=proc_session_end, args=(queue_sessions, output_path, save_packets))
     p_session_end.start()
@@ -121,7 +121,7 @@ def digest_packets_from_socket(port, address, output_path, save_packets):
         print('digested received packets. bye')
 
 
-def digest_packets_from_file(filename, output_path, save_packets):
+def digest_packets_from_file(filename, output_path, save_packets, plot_ai):
     queue_packets = multiprocessing.Queue()
     queue_sessions = multiprocessing.Queue()
 
@@ -135,7 +135,9 @@ def digest_packets_from_file(filename, output_path, save_packets):
     p_file = multiprocessing.Process(target=proc_file, args=(filename, queue_packets))
     p_file.start()
     p_digest = multiprocessing.Process(target=proc_digest,
-                                       args=(queue_packets, queue_sessions, output_path, save_packets, is_unpacked))
+                                       args=(
+                                           queue_packets, queue_sessions, output_path, save_packets, is_unpacked,
+                                           plot_ai))
     p_digest.start()
     p_session_end = multiprocessing.Process(target=proc_session_end, args=(queue_sessions, output_path, save_packets))
     p_session_end.start()
@@ -152,12 +154,14 @@ def main():
     parser.add_argument('-p', '--port', help='Port to listen to in. Network mode only', type=int)
     parser.add_argument('-a', '--address', help='IP Address to listen to in. Network mode only', type=str)
     parser.add_argument('--save-packets', help='Save packets of session to file', default=False, action='store_true')
+    parser.add_argument('--plot-ai', help='Plot qualification lap of fastest AI driver', default=False,
+                        action='store_true')
     parser.add_argument('-o', '--output-path', help='Directory to place files in', default='.', required=False)
     args = parser.parse_args()
     if args.network:
-        digest_packets_from_socket(int(args.port), args.address, args.output_path, args.save_packets)
+        digest_packets_from_socket(int(args.port), args.address, args.output_path, args.save_packets, args.plot_ai)
     elif args.file:
-        digest_packets_from_file(args.file, args.output_path, args.save_packets)
+        digest_packets_from_file(args.file, args.output_path, args.save_packets, args.plot_ai)
 
 
 if __name__ == '__main__':

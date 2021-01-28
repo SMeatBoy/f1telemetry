@@ -79,11 +79,7 @@ class Session:
         self.online = True if session_packet.networkGame == 1 else False
         self.packets = []
 
-    @property
-    def module(self):
-        return np
-
-    def plot_fastest_lap_distance(self, output_path, time=None):
+    def plot_fastest_lap_distance(self, output_path, time=None, plot_fastest_bot=False):
         fig = plt.figure()
         fig.suptitle('{} - {}: Best Lap Telemetry - Distance (m)'.format(f1telemetry.tracks.Tracks(self.track_id).name,
                                                                          f1telemetry.sessiontype.SessionType(
@@ -105,44 +101,56 @@ class Session:
         axs[2].yaxis.grid(True, 'minor', linestyle='--', color='#E0E0E0')
         axs[3].set_ylabel('Steer (°)')
         used_team_ids = []
+        fastest_bot_race_number = 0
+        fastest_bot_time = 0
         for participant in self.participants:
-            if participant.data.aiControlled == 0 and participant.best_lap_time != 0:
-                hotlap_indices = participant.laps[participant.best_lap_index].get_hotlap_indices()
-                fastest_hotlap_index = hotlap_indices[0]
-                for index in hotlap_indices:
-                    if participant.laps[participant.best_lap_index].time[index[1]] < \
-                            participant.laps[participant.best_lap_index].time[fastest_hotlap_index[1]]:
-                        fastest_hotlap_index = index
-                for i in range(fastest_hotlap_index[0], fastest_hotlap_index[1]):
-                    if participant.laps[participant.best_lap_index].distance[i] > \
-                            participant.laps[participant.best_lap_index].distance[i + 1]:
-                        fastest_hotlap_index = (fastest_hotlap_index[0], i)
-                        break
-                color, line_style, marker = get_line_attributes(used_team_ids, participant.data.teamId)
-                axs[0].plot(
-                    participant.laps[participant.best_lap_index].distance[
-                    fastest_hotlap_index[0]:fastest_hotlap_index[1]],
-                    participant.laps[participant.best_lap_index].telemetry.throttle[
-                    fastest_hotlap_index[0]:fastest_hotlap_index[1]],
-                    label=participant.data.raceNumber, color=color, linestyle=line_style)
-                axs[1].plot(
-                    participant.laps[participant.best_lap_index].distance[
-                    fastest_hotlap_index[0]:fastest_hotlap_index[1]],
-                    participant.laps[participant.best_lap_index].telemetry.brake[
-                    fastest_hotlap_index[0]:fastest_hotlap_index[1]],
-                    label=participant.data.raceNumber, color=color, linestyle=line_style)
-                axs[2].plot(
-                    participant.laps[participant.best_lap_index].distance[
-                    fastest_hotlap_index[0]:fastest_hotlap_index[1]],
-                    participant.laps[participant.best_lap_index].telemetry.speed[
-                    fastest_hotlap_index[0]:fastest_hotlap_index[1]],
-                    label=participant.data.raceNumber, color=color, linestyle=line_style)
-                axs[3].plot(
-                    participant.laps[participant.best_lap_index].distance[
-                    fastest_hotlap_index[0]:fastest_hotlap_index[1]],
-                    participant.laps[participant.best_lap_index].telemetry.steer[
-                    fastest_hotlap_index[0]:fastest_hotlap_index[1]],
-                    label=participant.data.raceNumber, color=color, linestyle=line_style)
+            if participant.data.aiControlled == 1:
+                if fastest_bot_time == 0:
+                    fastest_bot_time = participant.best_lap_time
+                    fastest_bot_race_number = participant.data.raceNumber
+                elif participant.best_lap_time < fastest_bot_time:
+                    fastest_bot_time = participant.best_lap_time
+                    fastest_bot_race_number = participant.data.raceNumber
+        for participant in self.participants:
+            if participant.best_lap_time != 0:
+                if participant.data.aiControlled == 0 or \
+                        (participant.data.raceNumber == fastest_bot_race_number and plot_fastest_bot):
+                    hotlap_indices = participant.laps[participant.best_lap_index].get_hotlap_indices()
+                    fastest_hotlap_index = hotlap_indices[0]
+                    for index in hotlap_indices:
+                        if participant.laps[participant.best_lap_index].time[index[1]] < \
+                                participant.laps[participant.best_lap_index].time[fastest_hotlap_index[1]]:
+                            fastest_hotlap_index = index
+                    for i in range(fastest_hotlap_index[0], fastest_hotlap_index[1]):
+                        if participant.laps[participant.best_lap_index].distance[i] > \
+                                participant.laps[participant.best_lap_index].distance[i + 1]:
+                            fastest_hotlap_index = (fastest_hotlap_index[0], i)
+                            break
+                    color, line_style, marker = get_line_attributes(used_team_ids, participant.data.teamId)
+                    axs[0].plot(
+                        participant.laps[participant.best_lap_index].distance[
+                        fastest_hotlap_index[0]:fastest_hotlap_index[1]],
+                        participant.laps[participant.best_lap_index].telemetry.throttle[
+                        fastest_hotlap_index[0]:fastest_hotlap_index[1]],
+                        label=participant.data.raceNumber, color=color, linestyle=line_style)
+                    axs[1].plot(
+                        participant.laps[participant.best_lap_index].distance[
+                        fastest_hotlap_index[0]:fastest_hotlap_index[1]],
+                        participant.laps[participant.best_lap_index].telemetry.brake[
+                        fastest_hotlap_index[0]:fastest_hotlap_index[1]],
+                        label=participant.data.raceNumber, color=color, linestyle=line_style)
+                    axs[2].plot(
+                        participant.laps[participant.best_lap_index].distance[
+                        fastest_hotlap_index[0]:fastest_hotlap_index[1]],
+                        participant.laps[participant.best_lap_index].telemetry.speed[
+                        fastest_hotlap_index[0]:fastest_hotlap_index[1]],
+                        label=participant.data.raceNumber, color=color, linestyle=line_style)
+                    axs[3].plot(
+                        participant.laps[participant.best_lap_index].distance[
+                        fastest_hotlap_index[0]:fastest_hotlap_index[1]],
+                        participant.laps[participant.best_lap_index].telemetry.steer[
+                        fastest_hotlap_index[0]:fastest_hotlap_index[1]],
+                        label=participant.data.raceNumber, color=color, linestyle=line_style)
         axs[2].legend(loc='lower left')
         self.save_fig(fig, output_path, (21, 9), time)
         plt.close(fig)
@@ -276,12 +284,12 @@ class Session:
                                                                self.session_type).pretty_name())),
                         format='svg', dpi=300)
 
-    def process_end(self, output_path, save_packets):
+    def process_end(self, output_path, save_packets, plot_ai):
         time = datetime.datetime.now()
         if self.session_type == f1telemetry.sessiontype.SessionType.R:
             self.plot_race_summary(output_path, time)
         elif self.session_type == f1telemetry.sessiontype.SessionType.Q_Short:
-            self.plot_fastest_lap_distance(output_path, time)
+            self.plot_fastest_lap_distance(output_path, time, plot_ai)
         if save_packets:
             with open(os.path.join(output_path,
                                    '{}_{}_{}-{}.pkl'.format(time.strftime('%Y-%m-%d'), self.uid,
@@ -298,12 +306,13 @@ class Session:
 
 class PacketDigester:
 
-    def __init__(self, queue, save_packets=False):
+    def __init__(self, queue, save_packets=False, store_ai_data=False):
         self.current_session = None
         self.current_session_uid = 0
         self.current_session_time = 0
         self.queue = queue
         self.save_packets = save_packets
+        self.store_ai_data = store_ai_data
 
     def digest(self, packet):
         if isinstance(packet, PacketSessionData_V1) and self.current_session_uid != packet.header.sessionUID:
@@ -352,7 +361,7 @@ class PacketDigester:
                 p.current_lap_num = lapData.currentLapNum
                 while p.current_lap_num > len(p.laps):
                     p.laps.append(f1telemetry.lap.Lap())
-            if p.data.aiControlled == 0:
+            if p.data.aiControlled == 0 or self.store_ai_data:
                 p.laps[p.current_lap_num - 1].distance.append(lapData.lapDistance)
                 p.laps[p.current_lap_num - 1].time.append(lapData.currentLapTime)
             p.laps[p.current_lap_num - 1].driver_status.append(lapData.driverStatus)
@@ -364,7 +373,7 @@ class PacketDigester:
         for carTelemetryData, p in zip(
                 packet.carTelemetryData[:len(self.current_session.participants)],
                 self.current_session.participants):
-            if p.data.aiControlled == 0:
+            if p.data.aiControlled == 0 or self.store_ai_data:
                 p.laps[p.current_lap_num - 1].telemetry.speed.append(
                     carTelemetryData.speed)
                 p.laps[p.current_lap_num - 1].telemetry.throttle.append(
@@ -387,7 +396,7 @@ class PacketDigester:
         for carStatusData, p in zip(
                 packet.carStatusData[:len(self.current_session.participants)],
                 self.current_session.participants):
-            if p.data.aiControlled == 0:
+            if p.data.aiControlled == 0 or self.store_ai_data:
                 p.laps[p.current_lap_num - 1].tyre_compound_actual = carStatusData.actualTyreCompound
                 p.laps[p.current_lap_num - 1].tyre_compound_visual = carStatusData.visualTyreCompound
                 p.laps[p.current_lap_num - 1].tyre_age_laps = carStatusData.tyresAgeLaps
