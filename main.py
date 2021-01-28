@@ -21,22 +21,6 @@ def remove_duplicate_session_types(sessions):
     return sessions
 
 
-# def read_packets_from_file(filename):
-#     record = []
-#     with open(filename, 'rb') as f:
-#         while True:
-#             try:
-#                 r = pickle.load(f)
-#                 record.append(r[2])
-#             except EOFError:
-#                 break
-#     # packets = []
-#     # for r in record:
-#     # packets.append(r)
-#     # packets = record[0]
-#     return record
-
-
 def proc_file(filename, queue):
     with open(filename, 'rb') as f:
         if filename.endswith('.pkl'):

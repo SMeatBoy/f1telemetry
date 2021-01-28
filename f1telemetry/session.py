@@ -300,7 +300,7 @@ class Session:
                                                             f1telemetry.sessiontype.SessionType(
                                                                 self.session_type).pretty_name())), 'wb') as f:
                 pickle.dump(self.packets, f)
-        if discord_url and file_name:
+        if discord_url and file_name and self.online:
             f1telemetry.discord_automation.upload_to_webhook(discord_url, os.path.join(output_path, file_name),
                                                              '{}-{}.svg'.format(
                                                                  f1telemetry.tracks.Tracks(self.track_id).name,
