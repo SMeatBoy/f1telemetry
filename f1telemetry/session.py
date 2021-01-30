@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker
 import numpy as np
 
-from f1_2020_telemetry.packets import *
+import f1_2020_telemetry.packets
 
 import f1telemetry.lap
 import f1telemetry.participant
@@ -306,11 +306,11 @@ class Session:
                                                                  f1telemetry.tracks.Tracks(self.track_id).name,
                                                                  f1telemetry.sessiontype.SessionType(
                                                                      self.session_type).pretty_name()))
-            print('{} digested session end: {} {}-{}'.format(datetime.datetime.now().strftime('%H:%M:%S.%f'),
-                                                             self.uid,
-                                                             f1telemetry.tracks.Tracks(self.track_id).name,
-                                                             f1telemetry.sessiontype.SessionType(
-                                                                 self.session_type).pretty_name()))
+        print('{} digested session end: {} {}-{}'.format(datetime.datetime.now().strftime('%H:%M:%S.%f'),
+                                                         self.uid,
+                                                         f1telemetry.tracks.Tracks(self.track_id).name,
+                                                         f1telemetry.sessiontype.SessionType(
+                                                             self.session_type).pretty_name()))
         return file_name
 
 
@@ -320,30 +320,38 @@ class PacketDigester:
         self.current_session = None
         self.current_session_uid = 0
         self.current_session_time = 0
+        self.current_frame_identifier = 0
         self.queue = queue
         self.save_packets = save_packets
         self.store_ai_data = store_ai_data
 
     def digest(self, packet):
-        if isinstance(packet, PacketSessionData_V1) and self.current_session_uid != packet.header.sessionUID:
+        if isinstance(packet,
+                      f1_2020_telemetry.packets.PacketSessionData_V1) and self.current_session_uid != packet.header.sessionUID:
             return self.digest_packet_session_data(packet)
-        if packet.header.sessionUID != 0 and packet.header.sessionUID == self.current_session_uid:
+        elif packet.header.sessionUID != 0 and packet.header.sessionUID == self.current_session_uid:
             if self.save_packets:
                 self.current_session.packets.append(packet)
-            if isinstance(packet, PacketParticipantsData_V1) and len(self.current_session.participants) == 0:
+            if isinstance(packet, f1_2020_telemetry.packets.PacketParticipantsData_V1) and len(
+                    self.current_session.participants) == 0:
                 return self.digest_packet_participants(packet)
-            elif isinstance(packet, PacketLapData_V1):
+            elif isinstance(packet, f1_2020_telemetry.packets.PacketLapData_V1):
                 return self.digest_packet_lap_data(packet)
             elif isinstance(packet,
-                            PacketCarTelemetryData_V1) and packet.header.sessionTime == self.current_session_time:
+                            f1_2020_telemetry.packets.PacketCarTelemetryData_V1) and packet.header.sessionTime == self.current_session_time:
                 return self.digest_packet_car_telemetry(packet)
-            elif isinstance(packet, PacketFinalClassificationData_V1):
+            elif isinstance(packet, f1_2020_telemetry.packets.PacketFinalClassificationData_V1):
                 return self.digest_packet_final_classification(packet)
-            elif isinstance(packet, PacketCarStatusData_V1):
+            elif isinstance(packet, f1_2020_telemetry.packets.PacketCarStatusData_V1):
                 return self.digest_packet_car_status(packet)
+        elif packet.header.sessionUID == 0 \
+                and isinstance(packet, f1_2020_telemetry.packets.PacketFinalClassificationData_V1) \
+                and packet.header.sessionTime > self.current_session_time:
+            return self.digest_packet_final_classification(packet)
 
     def digest_packet_session_data(self, packet):
         self.current_session_uid = packet.header.sessionUID
+        self.current_frame_identifier = packet.header.frameIdentifier
         self.current_session = Session(packet)
         self.current_session.packets = []
         print('{} received session start: {} {}-{}'.format(datetime.datetime.now().strftime('%H:%M:%S.%f'),

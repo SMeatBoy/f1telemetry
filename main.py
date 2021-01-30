@@ -4,7 +4,7 @@ import pickle
 import socket
 import sys
 
-from f1_2020_telemetry.packets import *
+import f1_2020_telemetry.packets
 
 import f1telemetry.session
 
@@ -45,7 +45,6 @@ def proc_socket(sock, queue):
 
 def proc_digest(queue_packets, queue_sessions, output_path, save_packets=False, is_unpacked=False, plot_ai=False):
     packet_digester = f1telemetry.session.PacketDigester(queue_sessions, save_packets, plot_ai)
-    i = 0
     while True:
         msg = queue_packets.get()
         if msg == 'DONE':
@@ -57,7 +56,7 @@ def proc_digest(queue_packets, queue_sessions, output_path, save_packets=False, 
             if is_unpacked:
                 packet_digester.digest(msg)
             else:
-                packet_digester.digest(unpack_udp_packet(msg))
+                packet_digester.digest(f1_2020_telemetry.packets.unpack_udp_packet(msg))
 
 
 def proc_session_end(queue, output_path, save_packets=False, plot_ai=False, discord_url=""):
@@ -88,8 +87,9 @@ def digest_packets_from_socket(port, address, output_path, save_packets, plot_ai
                                        args=(queue_packets, queue_sessions, output_path, save_packets, False, plot_ai))
     p_digest.start()
     p_session_end = multiprocessing.Process(target=proc_session_end,
-                                            args=(queue_sessions, output_path, save_packets, discord_url))
+                                            args=(queue_sessions, output_path, save_packets, plot_ai, discord_url))
     p_session_end.start()
+    proc_digest(queue_packets, queue_sessions, output_path, save_packets, False, plot_ai)
     try:
         p_socket.join()
         p_digest.join()
@@ -125,7 +125,7 @@ def digest_packets_from_file(filename, output_path, save_packets, plot_ai, disco
                                            plot_ai))
     p_digest.start()
     p_session_end = multiprocessing.Process(target=proc_session_end,
-                                            args=(queue_sessions, output_path, save_packets,plot_ai, discord_url))
+                                            args=(queue_sessions, output_path, save_packets, plot_ai, discord_url))
     p_session_end.start()
     p_file.join()
     p_digest.join()
