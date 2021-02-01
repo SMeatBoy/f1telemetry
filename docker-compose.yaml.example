@@ -1,0 +1,9 @@
+test:
+  build: ./src
+  environment:
+    - PLOT_AI=True
+    - DISCORD_URL=https://discord.com/api/webhooks/YOUR/TOKEN
+  ports:
+    - 20777:20777/udp
+  volumes:
+    - /path/to/results:/results

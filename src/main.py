@@ -1,5 +1,6 @@
 import argparse
 import multiprocessing
+import os
 import pickle
 import socket
 import sys
@@ -89,7 +90,6 @@ def digest_packets_from_socket(port, address, output_path, save_packets, plot_ai
     p_session_end = multiprocessing.Process(target=proc_session_end,
                                             args=(queue_sessions, output_path, save_packets, plot_ai, discord_url))
     p_session_end.start()
-    proc_digest(queue_packets, queue_sessions, output_path, save_packets, False, plot_ai)
     try:
         p_socket.join()
         p_digest.join()
@@ -133,23 +133,10 @@ def digest_packets_from_file(filename, output_path, save_packets, plot_ai, disco
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    mode = parser.add_mutually_exclusive_group(required=True)
-    mode.add_argument('-n', '--network', help='Read packets from network connection', action='store_true')
-    mode.add_argument('-f', '--file', help='Read packets from file', type=str, dest='file')
-    parser.add_argument('-p', '--port', help='Port to listen to in. Network mode only', type=int)
-    parser.add_argument('-a', '--address', help='IP Address to listen to in. Network mode only', type=str)
-    parser.add_argument('--save-packets', help='Save packets of session to file', default=False, action='store_true')
-    parser.add_argument('--plot-ai', help='Plot qualification lap of fastest AI driver', default=False,
-                        action='store_true')
-    parser.add_argument('-o', '--output-path', help='Directory to place files in', default='.', required=False)
-    parser.add_argument('--discord-url', help='URL of Discord Webhook to post results to', default='', required=False)
-    args = parser.parse_args()
-    if args.network:
-        digest_packets_from_socket(int(args.port), args.address, args.output_path, args.save_packets, args.plot_ai,
-                                   args.discord_url)
-    elif args.file:
-        digest_packets_from_file(args.file, args.output_path, args.save_packets, args.plot_ai, args.discord_url)
+    plot_ai = True if os.getenv('PLOT_AI') is not None else False
+    save_packets = True if os.getenv('SAVE_PACKETS') is not None else False
+    discord_url = os.getenv('DISCORD_URL', "")
+    digest_packets_from_socket(20777, '0.0.0.0', '/results', save_packets, plot_ai, discord_url)
 
 
 if __name__ == '__main__':
