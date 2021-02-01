@@ -1,0 +1,10 @@
+test:
+  build: ./src
+  environment:
+    - PLOT_AI=True
+    - SAVE_PACKETS=True
+    - DISCORD_URL=https://discord.com/api/webhooks/804282623232311306/bkgLT3TKyzlWd6FzjhvdikhUmtk4iNeIzwEiaS1iACXdZ05e_tmXQGKc-6PjR7mZJE0P
+  ports:
+    - 20777:20777/udp
+  volumes:
+    - /home/bastian/Documents/formula1/results:/results
