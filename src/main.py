@@ -50,7 +50,7 @@ def proc_digest(queue_packets, queue_sessions, output_path, save_packets=False, 
         if msg == 'DONE':
             queue_sessions.put('DONE')
             if packet_digester.current_session is not None:
-                packet_digester.current_session.process_end(output_path, save_packets)
+                packet_digester.current_session.process_end(output_path, save_packets,plot_ai,"")
             break
         else:
             if is_unpacked:
