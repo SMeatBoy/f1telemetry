@@ -6,4 +6,5 @@ def upload_to_webhook(url, file_path, file_name):
     with open(file_path) as f:
         webhook.add_file(file=f.read(), filename=file_name)
     response = webhook.execute()
-    print(response)
+    if response[0].status_code != 200:
+        print('Discord upload failed')
