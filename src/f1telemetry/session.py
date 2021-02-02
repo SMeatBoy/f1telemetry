@@ -225,50 +225,36 @@ class Session:
         plt.close(fig)
         return file_name
 
-    def get_tyre_data(self):
-        tyre_data = {}
-        for p in self.participants:
-            if p.data.aiControlled == 0:
-                laps = p.laps[:-1]
-                tyres = []
-                if p.data.yourTelemetry == 1:
-                    for i in range(len(laps)):
-                        if i != 0 and laps[i].tyre_age_laps == laps[i - 1].tyre_age_laps:
-                            laps[i].tyre_age_laps += 1
-                        if i != 0 and (i == len(laps) - 1 or laps[i].tyre_age_laps == 0):
-                            tyres.append([i + 1, laps[i - 1].tyre_compound_visual, laps[i - 1].tyre_compound_actual])
-                elif p.data.yourTelemetry == 0:
-                    for i in range(len(laps)):
-                        if i != 0 and (
-                                i == len(laps) - 1 or laps[i].tyre_compound_visual != laps[i - 1].tyre_compound_visual):
-                            tyres.append([i + 1, laps[i - 1].tyre_compound_visual, laps[i - 1].tyre_compound_actual])
-                tyre_data[p.data.raceNumber] = tyres
-        return tyre_data
-
     def subplot_tyre_stints(self, ax):
-        tyre_data = self.get_tyre_data()
-        race_numbers = list(tyre_data.keys())
-        race_numbers = race_numbers[::-1]
+        human_participants = [p for p in self.participants if p.data.aiControlled == 0]
         ax.set_title('Tyre Stints')
-        ax.set_yticks(np.arange(len(race_numbers)))
+        ax.set_yticks(np.arange(len(human_participants)))
         ax.xaxis.grid(True, zorder=0)
-        ax.set_yticklabels(race_numbers)
-        for i in range(len(race_numbers)):
-            stints = tyre_data[race_numbers[i]]
-            for j in range(len(stints) - 1, -1, -1):
-                if stints[j][0] != self.total_laps:
-                    ax.barh(i, stints[j][0] + (self.total_laps / 1000), color='black', align='center', zorder=3,
-                            height=0.6)
-                    ax.barh(i, stints[j][0] - (self.total_laps / 1000), color=tyre_colors[stints[j][1]],
-                            align='center',
-                            zorder=3, height=0.6)
-                else:
-                    ax.barh(i, stints[j][0], color=tyre_colors[stints[j][1]], align='center', zorder=3, height=0.6)
+        ax.set_yticklabels([p.data.raceNumber for p in human_participants])
+        for p, i in zip(human_participants, range(len(human_participants))):
+            pit_laps = [lap.lap_num for lap in p.laps if lap.lap_num != 0 and lap.pit_status[-1] == 1]
+            if p.tyre_stints:
+                tyre_stints = [t for t in p.tyre_stints if t != 0]
+            else:
+                tyre_stints = [p.laps[0].tyre_compound_actual]
+                for pit_lap in pit_laps:
+                    tyre_stints.append(p.laps[pit_lap - 1].tyre_compound_actual)
+                tyre_stints.append(p.laps[-1].tyre_compound_actual)
+            ax.barh(i, min(self.total_laps, len(p.laps)), color=tyre_colors[tyre_stints[-1]], align='center', zorder=3,
+                    height=0.6)
+            ax.annotate(tyre_names[tyre_stints[-1]],
+                        (((min(self.total_laps, len(p.laps)) - pit_laps[-1]) / 2 + pit_laps[-1]), i),
+                        ha='center', va='center', zorder=4)
+            for j in range(len(pit_laps) - 1, -1, -1):
+                ax.barh(i, pit_laps[j] + (self.total_laps / 1000), color='black', align='center', zorder=3,
+                        height=0.6)
+                ax.barh(i, pit_laps[j] - (self.total_laps / 1000), color=tyre_colors[tyre_stints[j]], align='center',
+                        zorder=3, height=0.6)
                 if j == 0:
-                    ax.annotate(tyre_names[stints[j][2]], (stints[j][0] / 2, i), ha='center', va='center', zorder=4)
+                    ax.annotate(tyre_names[tyre_stints[j]], (pit_laps[j] / 2, i), ha='center', va='center', zorder=4)
                 else:
-                    ax.annotate(tyre_names[stints[j][2]],
-                                (((stints[j][0] - stints[j - 1][0]) / 2 + stints[j - 1][0]), i),
+                    ax.annotate(tyre_names[tyre_stints[j]],
+                                (((pit_laps[j] - pit_laps[j - 1]) / 2 + pit_laps[j - 1]), i),
                                 ha='center', va='center', zorder=4)
 
     def save_fig(self, fig, output_path, aspect_ratio, time=None):
@@ -321,15 +307,17 @@ class PacketDigester:
         self.current_session_uid = 0
         self.current_session_time = 0
         self.current_frame_identifier = -1
+        self.current_packets = [None, None, None, None]
         self.queue = queue
         self.save_packets = save_packets
         self.store_ai_data = store_ai_data
-        self.current_packets = [None, None, None, None]
 
     def digest(self, packet):
         if isinstance(packet, f1_2020_telemetry.packets.PacketSessionData_V1) \
                 and self.current_session_uid != packet.header.sessionUID:
-            return self.digest_packet_session_data(packet)
+            self.digest_packet_session_data(packet)
+            if self.save_packets:
+                self.current_session.packets.append(packet)
         elif packet.header.sessionUID != 0 and packet.header.sessionUID == self.current_session_uid:
             if self.save_packets:
                 self.current_session.packets.append(packet)
@@ -356,7 +344,9 @@ class PacketDigester:
                 return self.digest_packet_final_classification(packet)
         elif packet.header.sessionUID == 0 \
                 and isinstance(packet, f1_2020_telemetry.packets.PacketFinalClassificationData_V1) \
-                and packet.header.sessionTime > self.current_session_time:
+                and packet.header.frameIdentifier >= self.current_frame_identifier:
+            if self.save_packets:
+                self.current_session.packets.append(packet)
             return self.digest_packet_final_classification(packet)
 
     def digest_packet_session_data(self, packet):
@@ -384,6 +374,7 @@ class PacketDigester:
                     if p.best_lap_time == 0 or p.best_lap_time > lapData.lastLapTime:
                         p.best_lap_time = lapData.lastLapTime
                         p.best_lap_index = p.current_lap_num - 1
+                    p.laps[p.current_lap_num - 1].lap_num = p.current_lap_num
                 p.laps.append(f1telemetry.lap.Lap())
                 p.current_lap_num = lapData.currentLapNum
                 while p.current_lap_num > len(p.laps):
@@ -450,7 +441,9 @@ class PacketDigester:
                                                          f1telemetry.tracks.Tracks(self.current_session.track_id).name,
                                                          f1telemetry.sessiontype.SessionType(
                                                              self.current_session.session_type).pretty_name()))
-
         self.queue.put(self.current_session)
-        self.current_session_uid = 0
         self.current_session = None
+        self.current_session_uid = 0
+        self.current_session_time = 0
+        self.current_frame_identifier = -1
+        self.current_packets = [None, None, None, None]
