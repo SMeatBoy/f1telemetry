@@ -233,27 +233,39 @@ class Session:
         ax.set_yticklabels([p.data.raceNumber for p in human_participants])
         for p, i in zip(human_participants, range(len(human_participants))):
             pit_laps = [lap.lap_num for lap in p.laps if lap.lap_num != 0 and lap.pit_status[-1] == 1]
-            if p.tyre_stints:
-                tyre_stints = [t for t in p.tyre_stints if t != 0]
+            if p.tyre_stints_actual:
+                tyre_stints_actual = [t for t in p.tyre_stints_actual if t != 0]
+                tyre_stints_visual = [t for t in p.tyre_stints_visual if t != 0]
             else:
-                tyre_stints = [p.laps[0].tyre_compound_actual]
+                tyre_stints_actual = [p.laps[0].tyre_compound_actual]
+                tyre_stints_visual = [p.laps[0].tyre_compound_visual]
                 for pit_lap in pit_laps:
-                    tyre_stints.append(p.laps[pit_lap - 1].tyre_compound_actual)
-                tyre_stints.append(p.laps[-1].tyre_compound_actual)
-            ax.barh(i, min(self.total_laps, len(p.laps)), color=tyre_colors[tyre_stints[-1]], align='center', zorder=3,
+                    tyre_stints_actual.append(p.laps[pit_lap - 1].tyre_compound_actual)
+                    tyre_stints_visual.append(p.laps[pit_lap - 1].tyre_compound_visual)
+                tyre_stints_actual.append(p.laps[-1].tyre_compound_actual)
+                tyre_stints_visual.append(p.laps[-1].tyre_compound_visual)
+            ax.barh(i, min(self.total_laps, len(p.laps)), color=tyre_colors[tyre_stints_visual[-1]], align='center',
+                    zorder=3,
                     height=0.6)
-            ax.annotate(tyre_names[tyre_stints[-1]],
-                        (((min(self.total_laps, len(p.laps)) - pit_laps[-1]) / 2 + pit_laps[-1]), i),
-                        ha='center', va='center', zorder=4)
+            if not pit_laps:
+                ax.annotate(tyre_names[tyre_stints_actual[-1]],
+                            (min(self.total_laps, len(p.laps)) / 2, i),
+                            ha='center', va='center', zorder=4)
+            else:
+                ax.annotate(tyre_names[tyre_stints_actual[-1]],
+                            (((min(self.total_laps, len(p.laps)) - pit_laps[-1]) / 2 + pit_laps[-1]), i),
+                            ha='center', va='center', zorder=4)
             for j in range(len(pit_laps) - 1, -1, -1):
                 ax.barh(i, pit_laps[j] + (self.total_laps / 1000), color='black', align='center', zorder=3,
                         height=0.6)
-                ax.barh(i, pit_laps[j] - (self.total_laps / 1000), color=tyre_colors[tyre_stints[j]], align='center',
+                ax.barh(i, pit_laps[j] - (self.total_laps / 1000), color=tyre_colors[tyre_stints_visual[j]],
+                        align='center',
                         zorder=3, height=0.6)
                 if j == 0:
-                    ax.annotate(tyre_names[tyre_stints[j]], (pit_laps[j] / 2, i), ha='center', va='center', zorder=4)
+                    ax.annotate(tyre_names[tyre_stints_actual[j]], (pit_laps[j] / 2, i), ha='center', va='center',
+                                zorder=4)
                 else:
-                    ax.annotate(tyre_names[tyre_stints[j]],
+                    ax.annotate(tyre_names[tyre_stints_actual[j]],
                                 (((pit_laps[j] - pit_laps[j - 1]) / 2 + pit_laps[j - 1]), i),
                                 ha='center', va='center', zorder=4)
 
@@ -340,6 +352,8 @@ class PacketDigester:
             if isinstance(packet, f1_2020_telemetry.packets.PacketParticipantsData_V1) \
                     and len(self.current_session.participants) == 0:
                 return self.digest_packet_participants(packet)
+            elif isinstance(packet, f1_2020_telemetry.packets.PacketEventData_V1):
+                return self.digest_packet_event(packet)
             elif isinstance(packet, f1_2020_telemetry.packets.PacketFinalClassificationData_V1):
                 return self.digest_packet_final_classification(packet)
         elif packet.header.sessionUID == 0 \
@@ -368,23 +382,24 @@ class PacketDigester:
     def digest_packet_lap_data(self, packet):
         for lapData, p in zip(packet.lapData[:len(self.current_session.participants)],
                               self.current_session.participants):
-            if lapData.currentLapNum != p.current_lap_num:
-                if p.current_lap_num >= 1:
-                    p.laps[-1].total_time = lapData.lastLapTime
-                    if p.best_lap_time == 0 or p.best_lap_time > lapData.lastLapTime:
-                        p.best_lap_time = lapData.lastLapTime
-                        p.best_lap_index = p.current_lap_num - 1
-                    p.laps[p.current_lap_num - 1].lap_num = p.current_lap_num
-                p.laps.append(f1telemetry.lap.Lap())
-                p.current_lap_num = lapData.currentLapNum
-                while p.current_lap_num > len(p.laps):
+            if lapData.currentLapNum != 0:
+                if lapData.currentLapNum != p.current_lap_num:
+                    if p.current_lap_num >= 1:
+                        p.laps[-1].total_time = lapData.lastLapTime
+                        if p.best_lap_time == 0 or p.best_lap_time > lapData.lastLapTime:
+                            p.best_lap_time = lapData.lastLapTime
+                            p.best_lap_index = p.current_lap_num - 1
+                        p.laps[p.current_lap_num - 1].lap_num = p.current_lap_num
                     p.laps.append(f1telemetry.lap.Lap())
-            if p.data.aiControlled == 0 or self.store_ai_data:
-                p.laps[p.current_lap_num - 1].distance.append(lapData.lapDistance)
-                p.laps[p.current_lap_num - 1].time.append(lapData.currentLapTime)
-            p.laps[p.current_lap_num - 1].driver_status.append(lapData.driverStatus)
-            p.laps[p.current_lap_num - 1].pit_status.append(lapData.pitStatus)
-            p.laps[p.current_lap_num - 1].car_position.append(lapData.carPosition)
+                    p.current_lap_num = lapData.currentLapNum
+                    while p.current_lap_num > len(p.laps):
+                        p.laps.append(f1telemetry.lap.Lap())
+                if p.data.aiControlled == 0 or (self.store_ai_data and self.current_session.session_type != 12):
+                    p.laps[p.current_lap_num - 1].distance.append(lapData.lapDistance)
+                    p.laps[p.current_lap_num - 1].time.append(lapData.currentLapTime)
+                p.laps[p.current_lap_num - 1].driver_status.append(lapData.driverStatus)
+                p.laps[p.current_lap_num - 1].pit_status.append(lapData.pitStatus)
+                p.laps[p.current_lap_num - 1].car_position.append(lapData.carPosition)
         self.current_session_time = packet.header.sessionTime
 
     def digest_packet_car_telemetry(self, packet):
@@ -419,6 +434,11 @@ class PacketDigester:
                 p.laps[p.current_lap_num - 1].tyre_compound_visual = carStatusData.visualTyreCompound
                 p.laps[p.current_lap_num - 1].tyre_age_laps = carStatusData.tyresAgeLaps
 
+    def digest_packet_event(self, packet):
+        if packet.eventStringCode.decode() == 'SEND':
+            if self.current_session.session_type == 12:
+                self.process_session_end()
+
     def digest_packet_final_classification(self, packet):
         for classificationData, p, in zip(
                 packet.classificationData[:len(self.current_session.participants)],
@@ -434,8 +454,12 @@ class PacketDigester:
             p.total_penalties_time = classificationData.penaltiesTime
             p.num_penalties = classificationData.numPenalties
             p.num_tyre_stints = classificationData.numTyreStints
-            for tyre_stint in classificationData.tyreStintsActual:
-                p.tyre_stints.append(tyre_stint)
+            for i in range(p.num_tyre_stints):
+                p.tyre_stints_actual.append(classificationData.tyreStintsActual[i])
+                p.tyre_stints_visual.append(classificationData.tyreStintsVisual[i])
+        self.process_session_end()
+
+    def process_session_end(self):
         print('{} received session end: {} {}-{}'.format(datetime.datetime.now().strftime('%H:%M:%S.%f'),
                                                          self.current_session.uid,
                                                          f1telemetry.tracks.Tracks(self.current_session.track_id).name,

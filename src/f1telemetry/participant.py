@@ -16,4 +16,5 @@ class Participant:
         self.total_penalties_time = 0
         self.num_penalties = 0
         self.num_tyre_stints = 0
-        self.tyre_stints = []
+        self.tyre_stints_actual = []
+        self.tyre_stints_visual = []

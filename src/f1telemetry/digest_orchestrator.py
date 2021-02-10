@@ -97,9 +97,9 @@ class DigestOrchestrator:
     def digest_file(self, filename):
         if filename.endswith('.pkl'):
             self.is_unpacked = True
-        if self.save_packets:
-            print("not saving packets, they're already in a separate .pkl file")
-            self.save_packets = False
+            if self.save_packets:
+                print("not saving packets, they're already in a separate .pkl file")
+                self.save_packets = False
         p_file = multiprocessing.Process(target=self.proc_file, args=(filename,))
         p_file.start()
         p_digest = multiprocessing.Process(target=self.proc_digest,

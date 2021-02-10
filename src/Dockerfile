@@ -14,4 +14,4 @@ COPY main_docker.py .
 # update PATH environment variable
 ENV PATH=/root/.local/bin:$PATH
 
-CMD ["python3","-u", "./main.py"]
+CMD ["python3","-u", "./main_docker.py"]
