@@ -28,18 +28,37 @@ teams = [
     f1telemetry.team.Team('Alpha Tauri', 6, '#C8C8C8'),
     f1telemetry.team.Team('Haas', 7, '#787878'),
     f1telemetry.team.Team('McLaren', 8, '#FF8700'),
-    f1telemetry.team.Team('Alfa Romeo', 9, '#9B0000'),
+    f1telemetry.team.Team('ART Grand Prix', 70, '#B4B3B4'),
+    f1telemetry.team.Team('Campos Racing', 71, '#EBC110'),
+    f1telemetry.team.Team('Carlin', 72, '#243EF6'),
+    f1telemetry.team.Team('Charouz Racing System', 73, '#84020A'),
+    f1telemetry.team.Team('DAMS', 74, '#0ED4FA'),
+    f1telemetry.team.Team('UNI-Virtuosi Racing', 75, '#FBEC20'),
+    f1telemetry.team.Team('MP Motorsport', 76, '#F7401A'),
+    f1telemetry.team.Team('PREMA Cacing', 77, '#E80309'),
+    f1telemetry.team.Team('Trident', 78, '#0E1185'),
+    f1telemetry.team.Team('BWT HWA Racelab', 79, '#FCB9E5'),
+    f1telemetry.team.Team('Hitech Grand Prix', 80, '#E8E8E8'),
 ]
 
 tyre_colors = {
+    15: "#FFFFFF",
     16: "#FF2D2C",
     17: "#FFD318",
     18: "#FFFFFF",
     7: "#3AC82C",
     8: "#4491D2",
+    24: "#FF2D2C",
+    25: "#FFD318",
+    26: "#FFFFFF",
 }
 
 tyre_names = {
+    11: "SS",
+    12: "S",
+    13: "M",
+    14: "H",
+    15: "W",
     16: "C5",
     17: "C4",
     18: "C3",
