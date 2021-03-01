@@ -401,7 +401,8 @@ class PacketDigester:
     def digest_packet_lap_data(self, packet):
         for lapData, p in zip(packet.lapData[:len(self.current_session.participants)],
                               self.current_session.participants):
-            if lapData.currentLapNum != 0:
+            if lapData.currentLapNum != 0 and lapData.resultStatus > 0:
+                p.result_status = lapData.resultStatus
                 if lapData.currentLapNum != p.current_lap_num:
                     if p.current_lap_num >= 1:
                         p.laps[-1].total_time = lapData.lastLapTime
@@ -425,7 +426,7 @@ class PacketDigester:
         for carTelemetryData, p in zip(
                 packet.carTelemetryData[:len(self.current_session.participants)],
                 self.current_session.participants):
-            if p.data.aiControlled == 0 or self.store_ai_data:
+            if p.result_status > 0 and (p.data.aiControlled == 0 or self.store_ai_data):
                 p.laps[p.current_lap_num - 1].telemetry.speed.append(
                     carTelemetryData.speed)
                 p.laps[p.current_lap_num - 1].telemetry.throttle.append(
@@ -448,7 +449,7 @@ class PacketDigester:
         for carStatusData, p in zip(
                 packet.carStatusData[:len(self.current_session.participants)],
                 self.current_session.participants):
-            if p.data.aiControlled == 0 or self.store_ai_data:
+            if p.result_status > 0 and (p.data.aiControlled == 0 or self.store_ai_data):
                 p.laps[p.current_lap_num - 1].tyre_compound_actual = carStatusData.actualTyreCompound
                 p.laps[p.current_lap_num - 1].tyre_compound_visual = carStatusData.visualTyreCompound
                 p.laps[p.current_lap_num - 1].tyre_age_laps = carStatusData.tyresAgeLaps
